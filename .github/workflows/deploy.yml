@@ -1,0 +1,67 @@
+name: Deploy Linky
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Run build
+      run: npm run build
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build Docker image
+      run: docker build -t linky:latest .
+    
+    - name: Test Docker image
+      run: |
+        docker run -d --name linky-test -p 3000:3000 linky:latest
+        sleep 10
+        curl -f http://localhost:3000/health || exit 1
+        docker stop linky-test
+        docker rm linky-test
+
+  deploy:
+    needs: [test, docker]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to production
+      run: echo "Deployment step - configure your deployment target here"
+      # Add your deployment steps here
+      # Examples:
+      # - Deploy to cloud provider (AWS, GCP, Azure)
+      # - Deploy to container registry
+      # - Deploy to hosting platform (Vercel, Netlify, etc.)
